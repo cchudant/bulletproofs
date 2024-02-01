@@ -417,8 +417,7 @@ impl RangeProof {
         let value_commitment_scalars = util::exp_iter(z).take(m).map(|z_exp| c * zz * z_exp);
         let basepoint_scalar = w * (self.t_x - a * b) + c * (delta(n, m, &y, &z) - self.t_x);
 
-        use curve25519_dalek::traits::VartimeMultiscalarMul;
-        let mega_check = RistrettoPoint::optional_multiscalar_mul(
+        let mega_check = bp_gens.optional_multiscalar_mul(n, m, g, h,
             iter::once(Scalar::ONE)
                 .chain(iter::once(x))
                 .chain(iter::once(c * x))
@@ -427,8 +426,6 @@ impl RangeProof {
                 .chain(x_inv_sq.iter().cloned())
                 .chain(iter::once(-self.e_blinding - c * self.t_x_blinding))
                 .chain(iter::once(basepoint_scalar))
-                .chain(g)
-                .chain(h)
                 .chain(value_commitment_scalars),
             iter::once(self.A.decompress())
                 .chain(iter::once(self.S.decompress()))
@@ -438,8 +435,6 @@ impl RangeProof {
                 .chain(self.ipp_proof.R_vec.iter().map(|R| R.decompress()))
                 .chain(iter::once(Some(pc_gens.B_blinding)))
                 .chain(iter::once(Some(pc_gens.B)))
-                .chain(bp_gens.G(n, m).map(|&x| Some(x)))
-                .chain(bp_gens.H(n, m).map(|&x| Some(x)))
                 .chain(value_commitments.iter().map(|V| V.decompress())),
         )
         .ok_or_else(|| ProofError::VerificationError)?;

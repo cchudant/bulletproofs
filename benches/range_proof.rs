@@ -13,7 +13,7 @@ use merlin::Transcript;
 use bulletproofs::RangeProof;
 use bulletproofs::{BulletproofGens, PedersenGens};
 
-static AGGREGATION_SIZES: [usize; 6] = [1, 2, 4, 8, 16, 32];
+static AGGREGATION_SIZES: [usize; 4] = [1, 2, 4, 8]; //, 16, 32]; // TODO(merge): change back
 
 fn create_aggregated_rangeproof_helper(n: usize, c: &mut Criterion) {
     let label = format!("Aggregated {}-bit rangeproof creation", n);
@@ -63,14 +63,31 @@ fn create_aggregated_rangeproof_n_64(c: &mut Criterion) {
     create_aggregated_rangeproof_helper(64, c);
 }
 
-fn verify_aggregated_rangeproof_helper(n: usize, c: &mut Criterion) {
-    let label = format!("Aggregated {}-bit rangeproof verification", n);
+criterion_group! {
+    name = create_rp;
+    config = Criterion::default().sample_size(10);
+    targets =
+    create_aggregated_rangeproof_n_8,
+    create_aggregated_rangeproof_n_16,
+    create_aggregated_rangeproof_n_32,
+    create_aggregated_rangeproof_n_64,
+}
+
+fn verify_aggregated_rangeproof_helper(n: usize, precomputed: bool, c: &mut Criterion) {
+    let label = if precomputed {
+        format!("Aggregated {}-bit rangeproof verification with precomputation", n)
+    } else {
+        format!("Aggregated {}-bit rangeproof verification", n)
+    };
 
     c.bench_function_over_inputs(
         &label,
         move |b, &&m| {
             let pc_gens = PedersenGens::default();
-            let bp_gens = BulletproofGens::new(n, m);
+            let mut bp_gens = BulletproofGens::new(n, m);
+            if precomputed {
+                bp_gens.precompute_tables();
+            }
             let mut rng = rand::thread_rng();
 
             let (min, max) = (0u64, ((1u128 << n) - 1) as u64);
@@ -100,29 +117,19 @@ fn verify_aggregated_rangeproof_helper(n: usize, c: &mut Criterion) {
 }
 
 fn verify_aggregated_rangeproof_n_8(c: &mut Criterion) {
-    verify_aggregated_rangeproof_helper(8, c);
+    verify_aggregated_rangeproof_helper(8, false, c);
 }
 
 fn verify_aggregated_rangeproof_n_16(c: &mut Criterion) {
-    verify_aggregated_rangeproof_helper(16, c);
+    verify_aggregated_rangeproof_helper(16, false, c);
 }
 
 fn verify_aggregated_rangeproof_n_32(c: &mut Criterion) {
-    verify_aggregated_rangeproof_helper(32, c);
+    verify_aggregated_rangeproof_helper(32, false, c);
 }
 
 fn verify_aggregated_rangeproof_n_64(c: &mut Criterion) {
-    verify_aggregated_rangeproof_helper(64, c);
-}
-
-criterion_group! {
-    name = create_rp;
-    config = Criterion::default().sample_size(10);
-    targets =
-    create_aggregated_rangeproof_n_8,
-    create_aggregated_rangeproof_n_16,
-    create_aggregated_rangeproof_n_32,
-    create_aggregated_rangeproof_n_64,
+    verify_aggregated_rangeproof_helper(64, false, c);
 }
 
 criterion_group! {
@@ -135,4 +142,30 @@ criterion_group! {
     verify_aggregated_rangeproof_n_64,
 }
 
-criterion_main!(create_rp, verify_rp);
+fn verify_aggregated_rangeproof_n_8_precompute(c: &mut Criterion) {
+    verify_aggregated_rangeproof_helper(8, true, c);
+}
+
+fn verify_aggregated_rangeproof_n_16_precompute(c: &mut Criterion) {
+    verify_aggregated_rangeproof_helper(16, true, c);
+}
+
+fn verify_aggregated_rangeproof_n_32_precompute(c: &mut Criterion) {
+    verify_aggregated_rangeproof_helper(32, true, c);
+}
+
+fn verify_aggregated_rangeproof_n_64_precompute(c: &mut Criterion) {
+    verify_aggregated_rangeproof_helper(64, true, c);
+}
+
+criterion_group! {
+    name = verify_rp_precompute;
+    config = Criterion::default();
+    targets =
+    verify_aggregated_rangeproof_n_8_precompute,
+    verify_aggregated_rangeproof_n_16_precompute,
+    verify_aggregated_rangeproof_n_32_precompute,
+    verify_aggregated_rangeproof_n_64_precompute,
+}
+
+criterion_main!(create_rp, verify_rp, verify_rp_precompute);
